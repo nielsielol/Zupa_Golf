@@ -1,0 +1,210 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+	<meta charset="UTF-8" />
+	<title>Phaser - Making your first game, part 1</title>
+	<script type="text/javascript" src="js/phaser.min.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+var WIDTH = 800;
+var HEIGHT = 600;
+
+var game = new Phaser.Game(WIDTH, HEIGHT, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+var platforms;
+var angle;
+var power;
+var golf_ball;
+var power_bar;
+var arrayStopped = [];
+var Moving = false;
+var hole;
+var pull;
+
+function preload() {
+    // Load all the images
+    game.load.image('sky', 'assets/sky.png');
+    game.load.image('ground', 'assets/platform.png');
+    game.load.image('golfball', 'assets/golfball.png');
+    game.load.image('redStripe', 'assets/redStripe.png');
+    game.load.image('hole','assets/hole.png');
+    game.load.image('invisible', 'assets/invisible.png');
+    game.load.image('visible', 'assets/visible.png');
+}
+
+function create() {
+    //set the physics
+    game.physics.startSystem(Phaser.Physics.ARCADE);
+    //set the background
+    game.add.sprite(0,0,'sky');
+
+    //set a group for the ground/walls
+    platforms = game.add.group();
+    platforms.enableBody = true;
+
+    hole = game.add.image(600,game.world.height - 90, 'hole');
+    hole.width = 30;
+    hole.height = 90;
+
+    pull = game.add.image(600,game.world.height - 100, 'visible');
+    pull.width = 30;
+    pull.height = 20;
+    //hole.body.immovable = true;
+
+    //set the ground!
+    var ground = platforms.create(0, game.world.height - 100, 'ground');
+    //ground.scale.setTo(2,4);
+    ground.width = 600;
+    ground.height = 100;
+    ground.body.immovable = true;
+
+    ground = platforms.create(630, game.world.height - 100, 'ground');
+    //ground.scale.setTo(2,4);
+    ground.width = 170;
+    ground.height = 100;
+    ground.body.immovable = true;
+
+    //set the angle to default
+    angle = [0, "right"];
+    power = 100;
+
+    //place and initialize the golf_ball!
+    golf_ball = game.add.sprite(64, (game.world.height-113), 'golfball');
+    //golf_ball.scale.setTo(0.25,0.25);
+    game.physics.arcade.enable(golf_ball);
+
+
+    golf_ball.body.gravity.y = 300;
+    golf_ball.body.bounce.y = 0.5;
+    golf_ball.body.collideWorldBounds = true;
+
+    //this is only for the first time (after this it will be set in the update.
+    power_bar = game.add.group();
+    for(var i = 0; i < power/20; i++)
+    {
+        power_bar.create((15 * i) +30 ,0, 'redStripe');
+    }
+    console.log("data", golf_ball.body.y, golf_ball.body.x);
+    power_bar.y = golf_ball.body.y+5;
+    power_bar.x = golf_ball.body.x+5;
+    power_bar.pivot = new Phaser.Point(0,10);
+
+
+    cursors = game.input.keyboard.createCursorKeys();
+    spacebar = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+
+}
+
+function update() {
+    game.physics.arcade.collide(golf_ball, platforms);
+
+    game.physics.overlap(golf_ball, pull, overlapWithInvisible());
+    //console.log("the velocity of power_bar (height - y) : x ", golf_ball.body.velocity);//, " : ", power_bar.x);
+
+    //console.log("the position of the golf_ball (height - y) : x", game.world.height - golf_ball.body.y, golf_ball.body.x);
+    //console.log(angle[0], power);
+    if(cursors.up.isDown){
+        angle[0]+=5;
+        if(angle[0] > 360){
+            angle[0] = 0;
+        }
+    }
+    if(cursors.down.isDown){
+        angle[0]-=5;
+        if(angle[0] < 0){
+            angle[0] = 360;
+        }
+    }
+
+    if(cursors.left.isDown){
+        if(power > 0){
+            power -= 1;
+        }
+    }
+    if(cursors.right.isDown){
+        if(power < 100){
+            power += 1;
+        }
+    }
+    if(spacebar.justPressed()){
+        var vel = calculateVelocity(power,angle[0]);
+        golf_ball.body.velocity.x = vel[0];
+        golf_ball.body.velocity.y = vel[1];
+    }
+
+
+
+    power_bar.destroy();
+
+    //add the power_bar to the game
+    power_bar = game.add.group();
+
+    //set the number of bars
+    for(var i = 0; i < power/20; i++)
+    {
+        power_bar.create((15 * i) + 30,0, 'redStripe');
+    }
+
+    //set the power bar next to the golfball
+    power_bar.y = golf_ball.body.y + 5;
+    power_bar.x = golf_ball.body.x + 5;
+
+    //set the correct pivot
+    power_bar.pivot = new Phaser.Point(0,10);
+
+    //and lastly set the rotation
+    power_bar.rotation = degreeToRadian(angle[0]);
+
+    //lets set the moving variable (true if moving this is however not really realiable) and false for not moving this
+    //one is realiable :)
+    testMoving(golf_ball.body.velocity, game.time.now);
+
+
+}
+var overlapWithInvisible = function(golf_ball, pull){
+    //golf_ball.body.gravity.y=600;
+}
+//Utils
+var degreeToRadian = function(degrees){
+    //console.log(game.math.degToRad(degrees), (360 - degrees) * Math.PI / 180);
+    return (360 - degrees) * Math.PI / 180;
+};
+
+var calculateVelocity = function(power, degrees){
+    power *= 5;
+    var y = Math.sin(game.math.degToRad(degrees)) * power;
+    var x = Math.cos(game.math.degToRad(degrees)) * power;
+    return [x,(-y)];
+};
+
+var firstoccurrence = 0;
+var testMoving = function(Point, timeMs){
+    if(firstoccurrence == 0){
+        firstoccurrence = timeMs;
+    } else if(timeMs - firstoccurrence > 300) {
+        firstoccurrence = 0;
+        arrayStopped.push(Point);
+        var booleanStopped = true;
+
+        if (arrayStopped.length > 5) {
+            arrayStopped.shift();
+
+            for (var i = 0; i < 5; i++) {
+                if (!(Math.abs(arrayStopped[i].x) < 2.2 && Math.abs(arrayStopped[i].y) < 2.2)) {
+                    booleanStopped = false;
+                }
+            }
+            Moving = !booleanStopped;
+        }
+    }
+};
+</script>
+
+</body>
+</html>
